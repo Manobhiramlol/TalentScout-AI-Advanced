@@ -1,8 +1,3 @@
-"""
-Advanced conversation engine for TalentScout AI
-Manages interview flow, context, and state transitions
-"""
-
 import logging
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, field
@@ -437,4 +432,5 @@ Thank you for demonstrating your technical expertise and communication skills. B
         context.current_stage = next
 
 conversation_engine = ConversationEngine()
+
 

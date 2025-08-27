@@ -4,10 +4,9 @@ from groq import Groq
 from dotenv import load_dotenv
 from datetime import datetime
 
-# Import components
+# Direct imports without using __init__.py
 from components.sidebar import render_sidebar
 from components.advanced_chat import render_chat_interface
-
 # Load environment variables
 load_dotenv()
 

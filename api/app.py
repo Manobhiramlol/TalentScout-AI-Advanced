@@ -1,8 +1,3 @@
-"""
-FastAPI application for TalentScout AI
-Main ASGI application entry point
-"""
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import router
@@ -34,3 +29,4 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "TalentScout AI API"}
+

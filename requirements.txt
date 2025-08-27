@@ -1,119 +1,12 @@
-# Core framework
-streamlit>=1.28.0
-
-# AI/LLM integration
-groq>=0.3.0
-
-# Environment management
-python-dotenv>=1.0.0
-
-# Async compatibility
-nest-asyncio>=1.5.0
-
-# Data visualization
-plotly>=5.0.0
-
-# Data handling and analysis
-pandas>=1.5.0
-
-# Additional utilities (if needed)
-datetime
-typing
-json
-os
-enum
-dataclasses
-
-# Optional: For enhanced features
-requests>=2.28.0
-numpy>=1.24.0
-
-# Optional: For sentiment analysis (if implemented)
-# textblob>=0.17.0
-# nltk>=3.8
-
-# Optional: For database operations (if using advanced DB)
-# sqlalchemy>=2.0.0
-=======
 streamlit
 groq
 python-dotenv
 nest-asyncio
+fastapi
+uvicorn
 plotly
 pandas
 requests
-numpy
-matplotlib
-seaborn
-scipy
-scikit-learn
-openai
-anthropic
-langchain
-transformers
-torch
-tensorflow
-textblob
-nltk
-spacy
 sqlalchemy
-pymongo
-redis
-psycopg2-binary
-fastapi
-uvicorn
-aiofiles
-httpx
-websockets
-cryptography
-pyjwt
-passlib
-bcrypt
-pypdf2
-python-docx
-openpyxl
-pillow
-aiohttp
-pytest
-pytest-asyncio
-black
-flake8
-mypy
-loguru
-sentry-sdk
-prometheus-client
-gunicorn
-boto3
-azure-storage-blob
-google-cloud-storage
-streamlit-chat
-streamlit-option-menu
-streamlit-lottie
-streamlit-extras
 pydantic
-typing-extensions
-dataclasses-json
-python-multipart
-email-validator
-python-jose
-itsdangerous
-click
-watchdog
-toml
-pyyaml
-markdown
-beautifulsoup4
-lxml
-joblib
-threadpoolctl
-certifi
-charset-normalizer
-idna
-urllib3
-six
-pytz
-dateutil
-packaging
-setuptools
-wheel
-pip
+numpy

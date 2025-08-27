@@ -1,428 +1,463 @@
 """
-Enhanced Advanced Chat Interface with Working Conversation Flow
+Enhanced Advanced Chat Interface with GROQ Integration
 Real-time AI interview questions powered by Llama 3.3 70B
 """
 
 import streamlit as st
 from datetime import datetime
-from typing import Dict, List, Optional
+import time
 
-def render_chat_interface():
-    """Enhanced chat interface with working conversation flow"""
+def render_chat_interface(client):
+    """Enhanced chat interface with working GROQ conversation flow"""
     
-    # Initialize AI components
-    if "ai_manager" not in st.session_state:
-        st.error("❌ AI Manager not initialized")
-        return
+    st.header("💬 Interview Chat")
     
-    # Display messages
-    display_enhanced_messages()
+    # Display conversation history with proper formatting
+    display_chat_messages()
     
-    # Dynamic question generation controls
-    render_question_controls()
-    
-    # Enhanced chat input
-    handle_chat_input()
+    # Interview start/continue logic
+    if not st.session_state.get('interview_started', False):
+        render_start_button(client)
+    else:
+        # Show dynamic controls during interview
+        render_interview_controls(client)
+        # Handle user input
+        handle_chat_input(client)
 
-def handle_chat_input():
-    """Handle chat input with proper conversation flow"""
+def display_chat_messages():
+    """Display all chat messages with proper Streamlit components"""
     
-    placeholder = get_dynamic_placeholder()
+    messages = st.session_state.get('conversation_history', [])
     
-    if prompt := st.chat_input(placeholder):
+    if not messages:
+        # Welcome message when no conversation exists
+        with st.chat_message("assistant", avatar="🤖"):
+            st.markdown("""
+            👋 **Welcome to TalentScout AI!**
+            
+            I'm your AI interviewer, powered by **Llama 3.3 70B**. 
+            
+            I'll conduct a personalized technical interview by:
+            - 🎯 Adapting questions to your experience level
+            - 💻 Focusing on your declared tech stack  
+            - 📊 Providing real-time analytics
+            - 🤖 Using advanced AI to generate dynamic questions
+            
+            Click **Start Interview** when you're ready!
+            """)
+    else:
+        # Display all messages in conversation history
+        for message in messages:
+            role = message.get('role', '')
+            content = message.get('content', '')
+            
+            if role == 'assistant':
+                with st.chat_message("assistant", avatar="🤖"):
+                    st.markdown(content)
+            elif role == 'user':
+                with st.chat_message("user", avatar="👤"):
+                    st.markdown(content)
+
+def render_start_button(client):
+    """Render the start interview button"""
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("🚀 Start Interview", type="primary", use_container_width=True):
+            start_interview(client)
+            st.rerun()
+
+def render_interview_controls(client):
+    """Render dynamic interview controls"""
+    
+    if st.session_state.get('current_stage') in ['technical_assessment', 'behavioral_assessment']:
+        st.markdown("---")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("🤖 Generate AI Question", use_container_width=True):
+                generate_ai_question(client)
+                st.rerun()
+        
+        with col2:
+            if st.button("🔄 Follow-up Question", use_container_width=True):
+                generate_followup_question(client)
+                st.rerun()
+        
+        with col3:
+            if st.button("⏭️ Next Stage", use_container_width=True):
+                advance_interview_stage(client)
+                st.rerun()
+
+def start_interview(client):
+    """Initialize the interview session"""
+    
+    st.session_state.interview_started = True
+    st.session_state.interview_start_time = datetime.now()
+    st.session_state.current_stage = 'greeting'
+    st.session_state.question_count = 0
+    
+    # Initialize conversation history if not exists
+    if 'conversation_history' not in st.session_state:
+        st.session_state.conversation_history = []
+    
+    # Generate initial greeting using GROQ
+    greeting_prompt = """You are a professional AI interviewer for TalentScout, a technology recruitment agency. 
+
+Start the interview with a warm, engaging greeting. Introduce yourself as the TalentScout AI interviewer powered by Llama 3.3 70B. 
+
+Ask for the candidate's name to begin the personalized interview process. Keep it professional but friendly."""
+    
+    try:
+        ai_response = get_groq_response(client, greeting_prompt, [])
+        add_message('assistant', ai_response)
+        st.session_state.question_count += 1
+    except Exception as e:
+        st.error(f"Failed to start interview: {str(e)}")
+
+def handle_chat_input(client):
+    """Handle user input with proper conversation flow"""
+    
+    # Get current stage for dynamic placeholder
+    stage = st.session_state.get('current_stage', 'greeting')
+    placeholder = get_input_placeholder(stage)
+    
+    # Chat input
+    user_input = st.chat_input(placeholder)
+    
+    if user_input and user_input.strip():
         # Add user message
-        add_enhanced_message("user", prompt)
+        add_message('user', user_input)
         
-        # Process response and generate AI reply
+        # Extract candidate information based on stage
+        if stage in ['greeting', 'info_collection']:
+            extract_candidate_info(user_input)
+        
+        # Generate AI response
         with st.spinner("🤖 AI is thinking..."):
-            ai_response = generate_ai_response(prompt)
-            if ai_response:
-                add_enhanced_message("assistant", ai_response)
-        
-        # Update conversation state
-        update_conversation_state(prompt)
-        st.rerun()
+            try:
+                ai_response = generate_contextual_response(client, user_input)
+                add_message('assistant', ai_response)
+                
+                # Update counters and stage
+                st.session_state.question_count = st.session_state.get('question_count', 0) + 1
+                update_interview_stage()
+                
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"Error generating response: {str(e)}")
 
-def generate_ai_response(user_input: str) -> str:
-    """Generate AI response based on conversation stage and user input"""
+def generate_contextual_response(client, user_input):
+    """Generate contextual AI response based on current stage"""
     
-    stage = st.session_state.get("conversation_stage", "greeting")
+    stage = st.session_state.get('current_stage', 'greeting')
+    candidate_info = st.session_state.get('candidate_info', {})
+    question_count = st.session_state.get('question_count', 0)
     
-    if stage == "greeting":
-        return handle_greeting_stage(user_input)
-    elif stage == "info_collection":
-        return handle_info_collection_stage(user_input)
-    elif stage == "technical_assessment":
-        return handle_technical_stage(user_input)
-    elif stage == "behavioral_assessment":
-        return handle_behavioral_stage(user_input)
+    # Build context-aware prompt based on stage
+    if stage == 'greeting':
+        prompt = f"""The candidate responded: "{user_input}"
+
+Extract their name and move to information collection. Ask for their email address next in a natural, conversational way."""
+
+    elif stage == 'info_collection':
+        missing_info = get_missing_info()
+        if missing_info:
+            next_field = missing_info[0]
+            field_prompts = {
+                'email': 'their email address',
+                'experience': 'their years of professional experience',
+                'position': 'what type of position they are interested in',
+                'tech_stack': 'their main programming languages and technologies'
+            }
+            prompt = f"""The candidate responded: "{user_input}"
+
+Current candidate info: {candidate_info}
+
+Ask for {field_prompts.get(next_field, next_field)} next. Be conversational and professional."""
+        else:
+            # All info collected, transition to technical
+            tech_stack = candidate_info.get('tech_stack', 'general programming')
+            prompt = f"""All basic information collected: {candidate_info}
+
+Now transition to technical questions. Generate your first technical question based on their tech stack: {tech_stack}
+
+Make it practical and relevant to their experience level."""
+
+    elif stage == 'technical_assessment':
+        tech_stack = candidate_info.get('tech_stack', 'programming')
+        experience = candidate_info.get('experience', '2-3 years')
+        prompt = f"""Candidate's response: "{user_input}"
+
+Background: {experience} experience with {tech_stack}
+Questions asked: {question_count}
+
+Generate a follow-up technical question or ask a new one. Focus on practical, real-world scenarios they might encounter."""
+
+    elif stage == 'behavioral_assessment':
+        prompt = f"""Candidate's behavioral response: "{user_input}"
+
+Ask a behavioral question using STAR methodology (Situation, Task, Action, Result). Focus on teamwork, problem-solving, or leadership scenarios."""
+
     else:
-        return "Thank you for your responses! Is there anything else you'd like to discuss?"
+        prompt = f"""Continue the interview conversation naturally. Candidate said: "{user_input}" """
 
-def handle_greeting_stage(user_input: str) -> str:
-    """Handle greeting stage conversation"""
-    
-    # Extract name from input
-    name = user_input.strip().title()
-    
-    # Initialize candidate data
-    if "candidate_data" not in st.session_state:
-        st.session_state.candidate_data = {}
-    
-    st.session_state.candidate_data["name"] = name
-    st.session_state.conversation_stage = "info_collection"
-    
-    return f"""Nice to meet you, **{name}**! 🎯
+    return get_groq_response(client, prompt, st.session_state.conversation_history)
 
-I'll be conducting an adaptive interview that adjusts based on your responses. My advanced AI will generate targeted questions specific to your background.
-
-Could you please share your **email address**?"""
-
-def handle_info_collection_stage(user_input: str) -> str:
-    """Handle information collection stage"""
+def get_groq_response(client, prompt, conversation_history):
+    """Get response from GROQ API"""
     
-    data = st.session_state.get("candidate_data", {})
-    
-    if "email" not in data:
-        # Validate email format
-        if "@" not in user_input or "." not in user_input:
-            return "Please provide a valid email address (e.g., john@example.com)"
+    try:
+        # Prepare messages for GROQ
+        messages = [
+            {
+                "role": "system",
+                "content": """You are a professional AI interviewer for TalentScout, powered by Llama 3.3 70B.
+
+Guidelines:
+- Be conversational, professional, and engaging
+- Ask one question at a time
+- Adapt questions based on candidate's background
+- Keep responses concise but thorough (2-3 paragraphs max)
+- Show genuine interest in their experience
+- Use markdown formatting for better readability
+- End with a clear, specific question"""
+            }
+        ]
         
-        data["email"] = user_input.strip()
-        return "Perfect! Now, **how many years of professional experience** do you have?"
-    
-    elif "experience" not in data:
-        data["experience"] = user_input.strip()
-        return "Great! **What type of position** are you interested in? (e.g., Software Engineer, Data Scientist, etc.)"
-    
-    elif "position" not in data:
-        data["position"] = user_input.strip()
-        return """Excellent! Now for the key part - **what programming languages, frameworks, and technologies** are you proficient with?
-
-Please list your main technical skills (e.g., Python, React, AWS, PostgreSQL)"""
-    
-    else:
-        # Parse tech stack and move to technical assessment
-        tech_skills = [skill.strip() for skill in user_input.split(",")]
-        data["tech_stack"] = tech_skills
+        # Add recent conversation history (last 8 messages)
+        for msg in conversation_history[-8:]:
+            if msg.get('role') and msg.get('content'):
+                messages.append({
+                    "role": msg['role'],
+                    "content": msg['content']
+                })
         
-        # Update conversation context
-        st.session_state.conversation_context = {
-            "position": data.get("position", "Software Developer"),
-            "experience": data.get("experience", "3 years"),
-            "skills": tech_skills
-        }
+        # Add current prompt
+        messages.append({"role": "user", "content": prompt})
         
-        st.session_state.conversation_stage = "technical_assessment"
+        # Make GROQ API call
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=500
+        )
         
-        return f"""Perfect! I now have your background:
-- **Position:** {data['position']}
-- **Experience:** {data['experience']}  
-- **Tech Stack:** {', '.join(tech_skills)}
+        return response.choices[0].message.content
+        
+    except Exception as e:
+        return f"I apologize, I'm experiencing technical difficulties. Error: {str(e)}. Please try again."
 
-Now I'll use **advanced AI prompt engineering** to generate technical questions specifically tailored to your skills. Let's begin the technical assessment! 🚀
+def generate_ai_question(client):
+    """Generate a new AI question based on candidate background"""
+    
+    candidate_info = st.session_state.get('candidate_info', {})
+    stage = st.session_state.get('current_stage', 'technical_assessment')
+    
+    if stage == 'technical_assessment':
+        tech_stack = candidate_info.get('tech_stack', 'programming')
+        experience = candidate_info.get('experience', '2-3 years')
+        
+        prompt = f"""Generate a technical interview question for someone with {experience} experience in {tech_stack}.
 
-**First Technical Question:**
+Make it:
+- Practical and scenario-based
+- Relevant to real-world development
+- Appropriate for their experience level
+- Different from previous questions asked
 
-Can you describe a challenging {tech_skills[0] if tech_skills else 'technical'} problem you've solved recently? Walk me through your approach and the solution you implemented."""
+Format as a clear, engaging question."""
+        
+        response = get_groq_response(client, prompt, [])
+        add_message('assistant', f"🤖 **AI-Generated Question:**\n\n{response}")
+    
+    elif stage == 'behavioral_assessment':
+        prompt = """Generate a behavioral interview question focusing on soft skills.
 
-def handle_technical_stage(user_input: str) -> str:
-    """Handle technical assessment stage"""
-    
-    # Track assessment progress
-    if "technical_questions_asked" not in st.session_state:
-        st.session_state.technical_questions_asked = 1
-    else:
-        st.session_state.technical_questions_asked += 1
-    
-    question_count = st.session_state.technical_questions_asked
-    
-    # Provide feedback and ask follow-up
-    feedback = f"""**Great response!** {get_encouraging_feedback(user_input)}
+Use STAR methodology and focus on one of these areas:
+- Teamwork and collaboration
+- Problem-solving under pressure  
+- Leadership and initiative
+- Adapting to change
+- Communication challenges
 
-**Follow-up Question {question_count}:**
-"""
-    
-    # Generate next technical question based on their background
-    skills = st.session_state.get("candidate_data", {}).get("tech_stack", ["programming"])
-    skill = skills[0] if skills else "programming"
-    
-    if question_count == 2:
-        next_question = f"How would you optimize the performance of a {skill} application that's running slowly in production? What steps would you take to identify and fix bottlenecks?"
-    elif question_count == 3:
-        next_question = f"Describe how you would design a scalable system architecture for a {skill}-based application that needs to handle thousands of concurrent users."
-    elif question_count >= 4:
-        # Move to behavioral assessment
-        st.session_state.conversation_stage = "behavioral_assessment"
-        return """🎉 **Technical Assessment Complete!**
+Make it specific and scenario-based."""
+        
+        response = get_groq_response(client, prompt, [])
+        add_message('assistant', f"🎯 **Behavioral Question:**\n\n{response}")
 
-You've demonstrated solid technical knowledge. Now let's explore your soft skills and behavioral competencies.
+def generate_followup_question(client):
+    """Generate a follow-up question based on last response"""
+    
+    messages = st.session_state.get('conversation_history', [])
+    user_messages = [m for m in messages if m['role'] == 'user']
+    
+    if user_messages:
+        last_response = user_messages[-1]['content']
+        
+        prompt = f"""The candidate just said: "{last_response}"
 
-**First Behavioral Question:**
+Generate a thoughtful follow-up question that:
+- Digs deeper into their approach
+- Explores alternatives they considered
+- Understands their decision-making process
+- Shows interest in their technical reasoning
 
-Tell me about a time when you had to work with a difficult team member or stakeholder. How did you handle the situation? Please use the STAR method: Situation, Task, Action, Result."""
-    else:
-        next_question = f"Can you explain the difference between {skill} concepts you mentioned and when you would use each approach?"
-    
-    return feedback + next_question
+Make it conversational and engaging."""
+        
+        response = get_groq_response(client, prompt, [])
+        add_message('assistant', f"🔄 **Follow-up:**\n\n{response}")
 
-def handle_behavioral_stage(user_input: str) -> str:
-    """Handle behavioral assessment stage"""
+def advance_interview_stage(client):
+    """Advance to the next interview stage"""
     
-    if "behavioral_questions_asked" not in st.session_state:
-        st.session_state.behavioral_questions_asked = 1
-    else:
-        st.session_state.behavioral_questions_asked += 1
+    current_stage = st.session_state.get('current_stage', 'greeting')
     
-    question_count = st.session_state.behavioral_questions_asked
+    stage_progression = {
+        'greeting': 'info_collection',
+        'info_collection': 'technical_assessment',
+        'technical_assessment': 'behavioral_assessment',
+        'behavioral_assessment': 'wrap_up'
+    }
     
-    if question_count >= 3:
-        # Complete interview
-        st.session_state.conversation_stage = "completed"
-        return generate_interview_completion()
+    next_stage = stage_progression.get(current_stage, 'wrap_up')
+    st.session_state.current_stage = next_stage
     
-    feedback = f"**Excellent example!** {get_encouraging_feedback(user_input)}"
+    # Generate transition message
+    transition_messages = {
+        'info_collection': "📝 **Information Collection Phase**\n\nLet's gather some details about your background.",
+        'technical_assessment': "💻 **Technical Assessment**\n\nNow I'll ask some technical questions based on your skills.",
+        'behavioral_assessment': "🤝 **Behavioral Assessment**\n\nLet's discuss some soft skills and work scenarios.",
+        'wrap_up': generate_interview_summary()
+    }
     
-    behavioral_questions = [
-        "Describe a time when you had to learn a new technology or skill quickly for a project. How did you approach it?",
-        "Tell me about a project where you had to meet a tight deadline. How did you ensure quality while working under pressure?",
-        "Give me an example of when you had to explain a complex technical concept to a non-technical stakeholder."
-    ]
-    
-    next_question = behavioral_questions[min(question_count-1, len(behavioral_questions)-1)]
-    
-    return f"""{feedback}
+    message = transition_messages.get(next_stage, "Moving to the next stage...")
+    add_message('assistant', message)
 
-**Behavioral Question {question_count}:**
-
-{next_question}
-
-Please structure your response using the STAR method (Situation, Task, Action, Result)."""
-
-def generate_interview_completion() -> str:
-    """Generate interview completion message"""
+def generate_interview_summary():
+    """Generate interview completion summary"""
     
-    name = st.session_state.candidate_data.get("name", "there")
+    candidate_info = st.session_state.get('candidate_info', {})
+    question_count = st.session_state.get('question_count', 0)
+    duration = calculate_duration()
     
-    return f"""🎯 **Interview Complete!**
+    name = candidate_info.get('name', 'there')
+    
+    return f"""🎉 **Interview Complete!**
 
 Thank you for your time today, **{name}**!
 
-You've successfully completed our AI-powered interview featuring:
-- ✅ Personalized questions based on your background
-- ✅ Technical assessment tailored to your skills
-- ✅ Behavioral evaluation using STAR methodology
-- ✅ Real-time conversation adaptation
+**📊 Interview Summary:**
+- **Questions Asked:** {question_count}
+- **Duration:** {duration}
+- **Stages Completed:** All phases ✅
 
-**Interview Summary:**
-- **Technical Questions:** {st.session_state.get('technical_questions_asked', 0)}
-- **Behavioral Questions:** {st.session_state.get('behavioral_questions_asked', 0)}
-- **Total Duration:** {calculate_interview_duration()}
+**🚀 Next Steps:**
+1. Our team will review your responses
+2. You'll hear back within 2-3 business days
+3. Prepare for potential technical deep-dive
 
-Our team will review your comprehensive responses and be in touch within 2-3 business days.
+**💡 Key Highlights:**
+- Demonstrated strong technical knowledge
+- Great communication skills
+- Professional throughout the process
 
-**Next Steps:**
-1. Review your responses in the sidebar analytics
-2. Await feedback from our hiring team
-3. Prepare for potential next-round interviews
+Have a wonderful day! 🌟"""
 
-Have a great day! 🚀"""
+# Helper functions
+def add_message(role, content):
+    """Add message to conversation history"""
+    if 'conversation_history' not in st.session_state:
+        st.session_state.conversation_history = []
+    
+    st.session_state.conversation_history.append({
+        'role': role,
+        'content': content,
+        'timestamp': datetime.now()
+    })
 
-def get_encouraging_feedback(response: str) -> str:
-    """Generate encouraging feedback based on response"""
+def extract_candidate_info(user_input):
+    """Extract candidate information from responses"""
     
-    response_length = len(response.split())
+    if 'candidate_info' not in st.session_state:
+        st.session_state.candidate_info = {}
     
-    if response_length > 50:
-        return "I appreciate the detailed explanation and thorough approach."
-    elif response_length > 20:
-        return "That shows good problem-solving thinking."
-    else:
-        return "Good start! Your experience is valuable."
+    candidate_info = st.session_state.candidate_info
+    user_lower = user_input.lower()
+    
+    # Extract name (simple approach)
+    if 'name' not in candidate_info and any(phrase in user_lower for phrase in ['my name is', 'i am', "i'm"]):
+        words = user_input.split()
+        for i, word in enumerate(words):
+            if word.lower() in ['am', 'is'] and i + 1 < len(words):
+                candidate_info['name'] = ' '.join(words[i+1:i+3]).strip('.,!?')
+                break
+    
+    # Extract email
+    if 'email' not in candidate_info and '@' in user_input:
+        import re
+        email_match = re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', user_input)
+        if email_match:
+            candidate_info['email'] = email_match.group()
+    
+    # Extract experience
+    if 'experience' not in candidate_info:
+        import re
+        patterns = [r'(\d+)\s*year', r'(\d+)\s*yr', r'over\s*(\d+)', r'about\s*(\d+)']
+        for pattern in patterns:
+            match = re.search(pattern, user_lower)
+            if match:
+                candidate_info['experience'] = f"{match.group(1)} years"
+                break
+    
+    # Extract tech stack
+    if any(word in user_lower for word in ['python', 'javascript', 'java', 'react', 'node', 'sql']):
+        tech_terms = ['python', 'javascript', 'java', 'react', 'node.js', 'sql', 'mongodb', 'aws', 'docker', 'git']
+        found_tech = [term for term in tech_terms if term in user_lower]
+        if found_tech and 'tech_stack' not in candidate_info:
+            candidate_info['tech_stack'] = ', '.join(found_tech).title()
 
-def calculate_interview_duration() -> str:
-    """Calculate total interview duration"""
-    
-    start_time = st.session_state.get("interview_start_time", datetime.now())
-    duration = datetime.now() - start_time
-    minutes = duration.seconds // 60
-    return f"{minutes} minutes"
+def get_missing_info():
+    """Get list of missing required information"""
+    candidate_info = st.session_state.get('candidate_info', {})
+    required = ['name', 'email', 'experience', 'position', 'tech_stack']
+    return [field for field in required if field not in candidate_info or not candidate_info[field]]
 
-def update_conversation_state(user_input: str):
-    """Update conversation state after user input"""
+def update_interview_stage():
+    """Update interview stage based on progress"""
+    candidate_info = st.session_state.get('candidate_info', {})
+    question_count = st.session_state.get('question_count', 0)
+    current_stage = st.session_state.get('current_stage', 'greeting')
     
-    # Extract technical terms
-    mentioned_tech = detect_technical_terms(user_input)
-    
-    if mentioned_tech and "candidate_data" in st.session_state:
-        current_skills = st.session_state.candidate_data.get("tech_stack", [])
-        updated_skills = list(set(current_skills + mentioned_tech))
-        st.session_state.candidate_data["tech_stack"] = updated_skills
-    
-    # Update conversation context
-    st.session_state.conversation_context = {
-        "position": st.session_state.get("candidate_data", {}).get("position", "Software Developer"),
-        "experience": st.session_state.get("candidate_data", {}).get("experience", "3 years"),
-        "skills": st.session_state.get("candidate_data", {}).get("tech_stack", ["Python"]),
-        "stage": st.session_state.get("conversation_stage", "technical"),
-        "last_response_length": len(user_input.split())
-    }
+    # Auto-advance logic
+    if current_stage == 'greeting' and len(st.session_state.get('conversation_history', [])) >= 4:
+        st.session_state.current_stage = 'info_collection'
+    elif current_stage == 'info_collection' and len(get_missing_info()) == 0:
+        st.session_state.current_stage = 'technical_assessment'
+    elif current_stage == 'technical_assessment' and question_count >= 8:
+        st.session_state.current_stage = 'behavioral_assessment'
+    elif current_stage == 'behavioral_assessment' and question_count >= 12:
+        st.session_state.current_stage = 'wrap_up'
 
-def render_question_controls():
-    """Render dynamic question generation controls"""
-    
-    if st.session_state.get("conversation_stage") in ["technical_assessment", "behavioral_assessment"]:
-        st.markdown("---")
-        
-        col1, col2, col3 = st.columns([1, 1, 1])
-        
-        with col1:
-            if st.button("🤖 Generate New Question", key="gen_new", use_container_width=True):
-                generate_dynamic_question_sync()
-        
-        with col2:
-            if st.button("🔄 Follow-up Question", key="gen_followup", use_container_width=True):
-                generate_followup_question_sync()
-        
-        with col3:
-            if st.button("⏭️ Next Stage", key="next_stage", use_container_width=True):
-                advance_to_next_stage()
-
-def generate_dynamic_question_sync():
-    """Generate AI-powered question"""
-    
-    with st.spinner("🧠 AI is crafting a personalized question..."):
-        try:
-            context = {
-                "position": st.session_state.get("candidate_data", {}).get("position", "Software Developer"),
-                "experience": st.session_state.get("candidate_data", {}).get("experience", "3 years"),
-                "skills": st.session_state.get("candidate_data", {}).get("tech_stack", ["Python"]),
-                "stage": st.session_state.get("conversation_stage", "technical"),
-                "asked_questions": [
-                    msg["content"] for msg in st.session_state.get("messages", []) 
-                    if msg["role"] == "assistant" and len(msg["content"]) > 50
-                ]
-            }
-            
-            if st.session_state.get("ai_manager"):
-                question_result = st.session_state.ai_manager.generate_dynamic_question_sync(context)
-                
-                if question_result["success"]:
-                    add_enhanced_message("assistant", f"""🤖 **AI Generated Question:**
-
-{question_result['question']}
-
-*This question was dynamically created by Llama 3.3 70B based on your specific background.*""")
-                    
-                    st.success("✨ New question generated!")
-                    st.rerun()
-                else:
-                    st.error(f"Question generation failed: {question_result.get('error', 'Unknown error')}")
-            else:
-                st.error("AI Manager not available")
-                
-        except Exception as e:
-            st.error(f"Question generation error: {e}")
-
-def generate_followup_question_sync():
-    """Generate follow-up question"""
-    
-    user_messages = [m for m in st.session_state.get("messages", []) if m["role"] == "user"]
-    ai_messages = [m for m in st.session_state.get("messages", []) if m["role"] == "assistant"]
-    
-    if not user_messages or not ai_messages:
-        st.warning("Need at least one Q&A exchange to generate follow-up")
-        return
-    
-    last_user_response = user_messages[-1]["content"]
-    add_enhanced_message("assistant", f"""🔄 **Follow-up Question:**
-
-Can you elaborate more on your approach? What alternatives did you consider, and why did you choose this specific solution over others?
-
-*This follow-up explores your decision-making process in more depth.*""")
-    st.rerun()
-
-def advance_to_next_stage():
-    """Advance to next interview stage"""
-    
-    current_stage = st.session_state.get("conversation_stage", "greeting")
-    
-    stage_mapping = {
-        "greeting": "info_collection",
-        "info_collection": "technical_assessment", 
-        "technical_assessment": "behavioral_assessment",
-        "behavioral_assessment": "completed"
-    }
-    
-    next_stage = stage_mapping.get(current_stage, "completed")
-    st.session_state.conversation_stage = next_stage
-    
-    stage_messages = {
-        "info_collection": "📝 **Information Collection**\n\nLet's gather details about your background.",
-        "technical_assessment": "🔧 **Technical Assessment**\n\nTime for technical questions tailored to your skills.",
-        "behavioral_assessment": "🤝 **Behavioral Assessment**\n\nLet's discuss soft skills using STAR methodology.",
-        "completed": "🎉 **Interview Complete**\n\nThank you for your time!"
-    }
-    
-    message = stage_messages.get(next_stage, "Moving to next stage")
-    add_enhanced_message("assistant", message)
-    st.rerun()
-
-def display_enhanced_messages():
-    """Display chat messages"""
-    
-    messages = st.session_state.get("messages", [])
-    
-    for message in messages:
-        role = message["role"]
-        content = message["content"]
-        
-        with st.chat_message(role, avatar=get_avatar(role)):
-            st.markdown(content)
-
-def add_enhanced_message(role: str, content: str):
-    """Add message to conversation"""
-    
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-    
-    message = {
-        "role": role,
-        "content": content,
-        "timestamp": datetime.now(),
-        "stage": st.session_state.get("conversation_stage", "greeting"),
-        "message_id": len(st.session_state.messages) + 1
-    }
-    
-    st.session_state.messages.append(message)
-
-def get_avatar(role: str) -> str:
-    """Get avatar for chat message"""
-    return "🤖" if role == "assistant" else "👤"
-
-def get_dynamic_placeholder() -> str:
-    """Get placeholder text for chat input"""
-    
-    stage = st.session_state.get("conversation_stage", "greeting")
-    
+def get_input_placeholder(stage):
+    """Get placeholder text for input based on stage"""
     placeholders = {
-        "greeting": "What's your name?",
-        "info_collection": "Enter your response...",
-        "technical_assessment": "Describe your technical approach...",
-        "behavioral_assessment": "Use STAR method (Situation, Task, Action, Result)...",
-        "completed": "Interview completed - thank you!"
+        'greeting': "What's your name?",
+        'info_collection': "Enter your response...",
+        'technical_assessment': "Describe your technical approach...",
+        'behavioral_assessment': "Use STAR method (Situation, Task, Action, Result)...",
+        'wrap_up': "Any final questions or comments?"
     }
-    
     return placeholders.get(stage, "Type your response...")
 
-def detect_technical_terms(text):
-    """Detect technical terms in text"""
-    
-    tech_keywords = [
-        "python", "javascript", "react", "node", "django", "flask", "aws",
-        "docker", "kubernetes", "git", "sql", "api", "database", "framework"
-    ]
-    
-    text_lower = text.lower()
-    found_terms = [term for term in tech_keywords if term in text_lower]
-    return found_terms
+def calculate_duration():
+    """Calculate interview duration"""
+    start_time = st.session_state.get('interview_start_time')
+    if start_time:
+        duration = datetime.now() - start_time
+        minutes = duration.seconds // 60
+        return f"{minutes} minutes"
+    return "0 minutes"

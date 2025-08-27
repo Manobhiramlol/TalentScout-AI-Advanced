@@ -240,33 +240,31 @@ def generate_contextual_response(client, user_input):
     
     # Check what information we still need
     required_info = ['name', 'email', 'experience', 'position', 'tech_stack']
-    missing_info = [field for field in required_info if field not in candidate_info]
+    missing_info = [field for field in required_info if field not in candidate_info or not candidate_info[field]]
     
     if stage == 'greeting' or stage == 'info_collection':
         if missing_info:
             # Still collecting information
             next_field = missing_info[0]
             
+            # Acknowledge what they just provided and ask for next info
             field_questions = {
-                'name': "Perfect! Now, could you please share your **email address**?",
-                'email': "Great! How many **years of professional experience** do you have?",
-                'experience': "Excellent! What **type of position** are you interested in or currently working in?",
-                'position': "Perfect! What are your main **technical skills and technologies** you work with? (e.g., Python, React, AWS, etc.)",
-                'tech_stack': "Thank you for sharing that information!"
+                'name': f"Nice to meet you, **{candidate_info.get('name', 'there')}**! Could you please share your **email address**?",
+                'email': f"Perfect! Now, how many **years of professional experience** do you have, {candidate_info.get('name', '')}?",
+                'experience': f"Great! **{candidate_info.get('experience', '')}** of experience is excellent. What **type of position** are you interested in or currently working in?",
+                'position': f"Perfect! **{candidate_info.get('position', '')}** is a great field. What are your main **technical skills and technologies**? (e.g., Python, React, AWS, etc.)",
+                'tech_stack': "Thank you for that information!"
             }
             
-            # Get the appropriate question for the next missing field
-            if next_field == 'name' and 'name' in candidate_info:
-                # Name was just collected, ask for email
+            # Return the appropriate question based on what was just collected
+            if 'name' in candidate_info and next_field == 'email':
                 return field_questions['name']
-            elif next_field == 'email' and 'email' in candidate_info:
+            elif 'email' in candidate_info and next_field == 'experience':
                 return field_questions['email']
-            elif next_field == 'experience' and 'experience' in candidate_info:
+            elif 'experience' in candidate_info and next_field == 'position':
                 return field_questions['experience']
-            elif next_field == 'position' and 'position' in candidate_info:
+            elif 'position' in candidate_info and next_field == 'tech_stack':
                 return field_questions['position']
-            elif next_field == 'tech_stack' and 'tech_stack' in candidate_info:
-                return field_questions['tech_stack']
             else:
                 return field_questions.get(next_field, "Could you tell me more about that?")
         else:
@@ -274,8 +272,11 @@ def generate_contextual_response(client, user_input):
             tech_stack = candidate_info.get('tech_stack', 'programming')
             st.session_state.current_stage = 'technical_assessment'
             
-            return f"""Perfect! I now have all your basic information:
+            return f"""Perfect! I now have all your information:
+
+**📋 Profile Summary:**
 - **Name:** {candidate_info.get('name', 'Not provided')}
+- **Email:** {candidate_info.get('email', 'Not provided')}
 - **Experience:** {candidate_info.get('experience', 'Not specified')}
 - **Position:** {candidate_info.get('position', 'Not specified')}
 - **Tech Stack:** {candidate_info.get('tech_stack', 'Not specified')}
@@ -283,57 +284,15 @@ def generate_contextual_response(client, user_input):
 Now let's move to the **technical assessment** phase! 💻
 
 **First Technical Question:**
-
 Can you describe a challenging project you've worked on recently using {tech_stack}? Walk me through your approach, the problems you faced, and how you solved them."""
     
+    # Continue with technical and other stages...
     elif stage == 'technical_assessment':
-        # Generate technical questions
-        tech_stack = candidate_info.get('tech_stack', 'programming')
-        question_num = st.session_state.get('question_count', 1) - len([field for field in required_info if field in candidate_info])
-        
-        technical_questions = [
-            f"Great response! Now, how would you optimize the performance of a {tech_stack} application that's running slowly in production?",
-            f"Interesting! Can you explain how you would design a scalable system architecture for a {tech_stack} application?",
-            f"Excellent! Tell me about your experience with testing in {tech_stack}. What testing strategies do you use?",
-            "Perfect! How do you handle error handling and debugging in your applications?",
-            "Great insight! What's your approach to code review and maintaining code quality in a team environment?"
-        ]
-        
-        if question_num < len(technical_questions):
-            return technical_questions[question_num - 1]
-        else:
-            # Move to behavioral assessment
-            st.session_state.current_stage = 'behavioral_assessment'
-            return """🎉 **Technical Assessment Complete!**
-
-You've demonstrated solid technical knowledge. Now let's explore your soft skills and work approach.
-
-**First Behavioral Question:**
-
-Tell me about a time when you had to work with a difficult team member or handle a challenging stakeholder situation. How did you manage it?"""
+        return "Great response! Tell me more about how you would optimize performance in your applications."
     
-    elif stage == 'behavioral_assessment':
-        behavioral_questions = [
-            "Excellent example! Describe a situation where you had to learn a new technology quickly for a project. How did you approach it?",
-            "Great! Tell me about a time when you had to meet a tight deadline. How did you ensure quality while working under pressure?",
-            "Perfect! Give me an example of when you had to explain a complex technical concept to a non-technical team member.",
-            "Thank you for sharing that! How do you handle feedback and criticism of your work?"
-        ]
-        
-        question_num = len([m for m in st.session_state.conversation_history if m.get('role') == 'assistant' and 'behavioral' in m.get('content', '').lower()])
-        
-        if question_num < len(behavioral_questions):
-            return behavioral_questions[question_num]
-        else:
-            # Move to wrap up
-            st.session_state.current_stage = 'wrap_up'
-            return generate_interview_completion()
-    
-    elif stage == 'wrap_up':
-        return "Thank you for your additional thoughts! Is there anything else you'd like to add about your background or ask about the position?"
-    
-    # Default response
-    return get_groq_response(client, f"Continue the interview conversation. User said: {user_input}", st.session_state.conversation_history)
+    else:
+        return "Thank you for your response. Let's continue with the interview."
+
 
 def generate_interview_completion():
     """Generate completion message"""

@@ -154,36 +154,49 @@ def extract_candidate_info(user_input):
         if email_match:
             candidate_info['email'] = email_match.group()
     
-    # Extract experience
+    # **FIXED: Experience extraction with multiple approaches**
     if 'experience' not in candidate_info:
-        exp_patterns = [
-            r'(\d+)\s*(?:years?|yrs?)\s*(?:of\s*)?(?:experience|exp)',
-            r'(?:experience|exp)\s*(?:of\s*)?(\d+)\s*(?:years?|yrs?)',
-            r'(\d+)\+?\s*(?:years?|yrs?)',
-            r'over\s*(\d+)\s*(?:years?|yrs?)',
-            r'about\s*(\d+)\s*(?:years?|yrs?)'
-        ]
-        
-        for pattern in exp_patterns:
-            match = re.search(pattern, user_lower)
-            if match:
-                years = match.group(1)
+        # Approach 1: Check if it's just a number (like "2", "5", "10")
+        if user_input.strip().isdigit():
+            years = int(user_input.strip())
+            if 0 <= years <= 50:  # Reasonable range for years of experience
                 candidate_info['experience'] = f"{years} years"
-                break
         
-        # Check for experience level words
-        if 'experience' not in candidate_info:
-            if any(word in user_lower for word in ['fresher', 'fresh', 'new graduate', 'entry']):
+        # Approach 2: Look for explicit year patterns
+        elif not candidate_info.get('experience'):
+            exp_patterns = [
+                r'(\d+)\s*(?:years?|yrs?)\s*(?:of\s*)?(?:experience|exp)',
+                r'(?:experience|exp)\s*(?:of\s*)?(\d+)\s*(?:years?|yrs?)',
+                r'(\d+)\+?\s*(?:years?|yrs?)',
+                r'over\s*(\d+)\s*(?:years?|yrs?)',
+                r'about\s*(\d+)\s*(?:years?|yrs?)',
+                r'around\s*(\d+)\s*(?:years?|yrs?)',
+                r'(\d+)\s*year',  # Simple "2 year" or "5 years"
+            ]
+            
+            for pattern in exp_patterns:
+                match = re.search(pattern, user_lower)
+                if match:
+                    years = match.group(1)
+                    candidate_info['experience'] = f"{years} years"
+                    break
+        
+        # Approach 3: Check for experience level words
+        if not candidate_info.get('experience'):
+            if any(word in user_lower for word in ['fresher', 'fresh', 'new graduate', 'entry', 'no experience', '0']):
                 candidate_info['experience'] = "Fresher"
-            elif any(word in user_lower for word in ['senior', 'lead', 'principal']):
+            elif any(word in user_lower for word in ['senior', 'lead', 'principal', 'experienced']):
                 candidate_info['experience'] = "Senior level"
+            elif 'junior' in user_lower:
+                candidate_info['experience'] = "Junior level"
     
     # Extract position/role
     if 'position' not in candidate_info:
         tech_roles = [
             'software engineer', 'software developer', 'web developer', 'full stack',
             'frontend developer', 'backend developer', 'data scientist', 'data analyst',
-            'machine learning engineer', 'ai engineer', 'devops', 'qa engineer'
+            'machine learning engineer', 'ai engineer', 'devops', 'qa engineer',
+            'python developer', 'java developer', 'react developer'
         ]
         
         for role in tech_roles:
@@ -192,27 +205,33 @@ def extract_candidate_info(user_input):
                 break
         
         # Simple role extraction if no specific match
-        if 'position' not in candidate_info and ('engineer' in user_lower or 'developer' in user_lower):
-            candidate_info['position'] = user_input.strip().title()
+        if 'position' not in candidate_info:
+            if any(word in user_lower for word in ['engineer', 'developer', 'programmer', 'analyst']):
+                candidate_info['position'] = user_input.strip().title()
     
-    # Extract tech stack
+    # Extract tech stack (improved)
     if 'tech_stack' not in candidate_info:
         tech_keywords = [
             'python', 'javascript', 'java', 'react', 'node.js', 'angular', 'vue',
             'django', 'flask', 'express', 'spring', 'sql', 'mongodb', 'postgresql',
-            'aws', 'azure', 'docker', 'kubernetes', 'git', 'html', 'css'
+            'aws', 'azure', 'docker', 'kubernetes', 'git', 'html', 'css', 'php',
+            'c++', 'c#', '.net', 'ruby', 'go', 'rust', 'swift', 'kotlin'
         ]
         
         mentioned_tech = []
         for tech in tech_keywords:
-            if tech in user_lower:
+            if tech in user_lower or tech.replace('.', '') in user_lower:
                 mentioned_tech.append(tech.title())
         
         if mentioned_tech:
             candidate_info['tech_stack'] = ', '.join(mentioned_tech)
-        elif any(word in user_lower for word in ['programming', 'coding', 'development']):
-            # If they mention general programming terms
+        elif any(word in user_lower for word in ['programming', 'coding', 'development', 'tech', 'stack']):
+            # If they mention general programming terms, use their input
             candidate_info['tech_stack'] = user_input.strip()
+
+    # **Debug logging - remove this after testing**
+    st.write(f"**Debug:** Extracted info so far: {candidate_info}")
+
 
 def generate_contextual_response(client, user_input):
     """Generate contextual AI response with proper stage management"""

@@ -27,6 +27,7 @@ var/
 venv/
 ENV/
 env/
+talentscout_env/
 
 # Environment variables and secrets
 .env
@@ -85,4 +86,4 @@ dmypy.json
 .streamlit/
 
 # CRITICAL: Never commit API keys or sensitive data!
-# Add any other files or directories that may contain sensitive information.
+# Add any other files or directories that may contain sensitive information.talentscout_env/

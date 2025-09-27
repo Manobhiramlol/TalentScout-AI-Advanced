@@ -66,7 +66,7 @@ TalentScout AI is a state-of-the-art hiring assistant chatbot that revolutionize
 - Live interview progress tracking with visual indicators  
 - Response quality analysis with sentiment scoring  
 - Technical skill assessment based on declared tech stack  
-- Performance metrics including response time and engagement levels  
+- Performance metrics, including response time and engagement levels  
 - Export functionality for comprehensive interview reports
 
 ---
@@ -499,3 +499,4 @@ Your TalentScout AI system is production-ready and demonstrates enterprise-level
 Built with ❤️ and advanced AI for revolutionizing technical hiring
 TalentScout AI Advanced v2.0 — Where Intelligence Meets Talent
 © 2025 Manolol. All rights reserved under MIT License.
+
